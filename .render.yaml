@@ -1,14 +1,13 @@
 services:
   - type: web
     name: whatsapp-chatbot
-    env: python
-    plan: free
+    runtime: python
     buildCommand: ""
     startCommand: python app.py
     envVars:
       - key: OPENAI_API_KEY
-        sync: false
+        fromEnvVar: OPENAI_API_KEY
       - key: WHATSAPP_TOKEN
-        sync: false
+        fromEnvVar: WHATSAPP_TOKEN
       - key: PHONE_NUMBER_ID
-        sync: false
+        fromEnvVar: PHONE_NUMBER_ID
