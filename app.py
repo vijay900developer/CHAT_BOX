@@ -4,6 +4,7 @@ from openai import OpenAI
 import logging
 from colorama import Fore, Style, init
 import os
+from datetime import datetime
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # or logging.CRITICAL to suppress almost everything
 # 🎨 Enable colored output
@@ -23,6 +24,23 @@ SESSION_CONTEXT = {}
 with open("system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
+# Google Sheet Web App URL (replace with your actual deployment URL)
+SHEET_WEBHOOK_URL = "https://script.google.com/a/macros/cityvibes.in/s/AKfycbzLSg78g2gAaCy4BtSTSiH1tPyJwoeHdJKy7hOrQx1aNScdbsXk4bQvni2EpZZiyA/exec"
+
+def log_to_google_sheet(phone_number, sender, message, name=None):
+    payload = {
+        
+        "date": datetime.now().strftime("%d-%m-%Y"),
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "phone_number": phone_number,
+        "name": name or "",
+        "sender": sender,  # "User" or "Bot"
+        "message": message
+    }
+    try:
+        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
+    except Exception as e:
+        print("⚠️ Failed to log to Google Sheet:", e)
 
 # WhatsApp API endpoint
 WHATSAPP_API_URL = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
@@ -47,21 +65,6 @@ def send_whatsapp_message(phone_number: str, message: str):
     except Exception as e:
         print("❌ Failed to send WhatsApp message:", e)
 
-# Google Sheet Web App URL (replace with your actual deployment URL)
-SHEET_WEBHOOK_URL = "https://script.google.com/a/macros/cityvibes.in/s/AKfycbzLSg78g2gAaCy4BtSTSiH1tPyJwoeHdJKy7hOrQx1aNScdbsXk4bQvni2EpZZiyA/exec"
-
-def log_to_google_sheet(phone_number, sender, message, name=None):
-    payload = {
-        "phone_number": phone_number,
-        "sender": sender,  # "User" or "Bot"
-        "message": message,
-        "name": name or "",
-        "session_id": phone_number
-    }
-    try:
-        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
-    except Exception as e:
-        print("⚠️ Failed to log to Google Sheet:", e)
 
 
 def ask_openai(session_id: str, user_message: str):
@@ -130,6 +133,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
