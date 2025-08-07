@@ -3,11 +3,15 @@ import requests
 from openai import OpenAI
 import logging
 from colorama import Fore, Style, init
+import os
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # or logging.CRITICAL to suppress almost everything
 # 🎨 Enable colored output
 init(autoreset=True)
-from config import OPENAI_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+WHATSAPP_TOKEN = os.environ["WHATSAPP_TOKEN"]
+PHONE_NUMBER_ID = os.environ["PHONE_NUMBER_ID"]
+
 
 app = Flask(__name__)
 client = OpenAI(api_key=OPENAI_API_KEY)
