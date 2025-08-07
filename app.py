@@ -47,6 +47,22 @@ def send_whatsapp_message(phone_number: str, message: str):
     except Exception as e:
         print("❌ Failed to send WhatsApp message:", e)
 
+# Google Sheet Web App URL (replace with your actual deployment URL)
+SHEET_WEBHOOK_URL = "https://script.google.com/a/macros/cityvibes.in/s/AKfycbzLSg78g2gAaCy4BtSTSiH1tPyJwoeHdJKy7hOrQx1aNScdbsXk4bQvni2EpZZiyA/exec"
+
+def log_to_google_sheet(phone_number, sender, message, name=None):
+    payload = {
+        "phone_number": phone_number,
+        "sender": sender,  # "User" or "Bot"
+        "message": message,
+        "name": name or "",
+        "session_id": phone_number
+    }
+    try:
+        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
+    except Exception as e:
+        print("⚠️ Failed to log to Google Sheet:", e)
+
 
 def ask_openai(session_id: str, user_message: str):
     context = SESSION_CONTEXT.get(session_id, [])
@@ -92,8 +108,10 @@ def webhook():
                 session_id = phone_number
 
                 print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
+                log_to_google_sheet(phone_number, "User", text)
                 reply = ask_openai(session_id, text)
                 print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
+                log_to_google_sheet(phone_number, "Bot", reply)
                 send_whatsapp_message(phone_number, reply)
                 return "OK", 200
             else:
@@ -112,5 +130,6 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
