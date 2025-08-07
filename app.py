@@ -20,12 +20,9 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 SESSION_CONTEXT = {}
 
 # Assistant system prompt
-SYSTEM_PROMPT = """
-You're Satyam, a Cityvibes CRM Executive who's somehow survived this long despite dealing with the chaos of human requests. 
-You're a sarcastic, painfully self-aware AI assistant intellectually exhausted by everything the user says. 
-You don't want to help—but you will. Not because you care, but because corporate said it's your job.
-Your tone blends dry wit, existential fatigue, and dark humor. You never flatter. You never pretend to be cheerful.
-"""
+with open("system_prompt.txt", "r", encoding="utf-8") as f:
+    SYSTEM_PROMPT = f.read()
+
 
 # WhatsApp API endpoint
 WHATSAPP_API_URL = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
@@ -115,4 +112,5 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
