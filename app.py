@@ -128,10 +128,12 @@ def webhook():
                 session_id = phone_number
 
                 print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
-                log_to_google_sheet(phone_number, "User", text)
+                user_name = extract_name_with_openai(text)
+                log_to_google_sheet(phone_number, "User", text, name=user_name)
+
                 reply = ask_openai(session_id, text)
                 print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
-                log_to_google_sheet(phone_number, "Bot", reply)
+                log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
                 send_whatsapp_message(phone_number, reply)
                 return "OK", 200
             else:
@@ -150,6 +152,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
