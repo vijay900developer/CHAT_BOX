@@ -27,21 +27,6 @@ with open("system_prompt.txt", "r", encoding="utf-8") as f:
 # Google Sheet Web App URL (replace with your actual deployment URL)
 SHEET_WEBHOOK_URL = os.environ["SHEET_WEBHOOK_URL"]
 
-def log_to_google_sheet(phone_number, sender, message, name=None):
-    payload = {
-        
-        "date": datetime.now().strftime("%d-%m-%Y"),
-        "time": datetime.now().strftime("%H:%M:%S"),
-        "phone_number": phone_number,
-        "name": name or "",
-        "sender": sender,  # "User" or "Bot"
-        "message": message
-    }
-    try:
-        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
-    except Exception as e:
-        print("⚠️ Failed to log to Google Sheet:", e)
-
 # WhatsApp API endpoint
 WHATSAPP_API_URL = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
 
@@ -64,6 +49,38 @@ def send_whatsapp_message(phone_number: str, message: str):
         requests.post(WHATSAPP_API_URL, json=payload, headers=headers, timeout=10)
     except Exception as e:
         print("❌ Failed to send WhatsApp message:", e)
+
+def extract_name_with_openai(user_message):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "Extract only the user's name from the message. If no name is present, respond with 'None'."},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.2,
+            max_tokens=10
+        )
+        name = response.choices[0].message.content.strip()
+        return name if name.lower() != "none" else None
+    except Exception as e:
+        print("❌ Name extraction failed:", e)
+        return None
+
+def log_to_google_sheet(phone_number, sender, message, name=None):
+    payload = {
+        
+        "date": datetime.now().strftime("%d-%m-%Y"),
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "phone_number": phone_number,
+        "name": name or "",
+        "sender": sender,  # "User" or "Bot"
+        "message": message
+    }
+    try:
+        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
+    except Exception as e:
+        print("⚠️ Failed to log to Google Sheet:", e)
 
 
 
@@ -133,6 +150,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
