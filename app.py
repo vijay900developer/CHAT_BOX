@@ -25,7 +25,7 @@ with open("system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
 # Google Sheet Web App URL (replace with your actual deployment URL)
-SHEET_WEBHOOK_URL = "https://script.google.com/a/macros/cityvibes.in/s/AKfycbzLSg78g2gAaCy4BtSTSiH1tPyJwoeHdJKy7hOrQx1aNScdbsXk4bQvni2EpZZiyA/exec"
+SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzxWDDWd-B1v06WTwIyM9kuQkLn-zDg9h4hRAnigMyTh88jKJc7WgbsJQ_LHziuOVHMyg/exec"
 
 def log_to_google_sheet(phone_number, sender, message, name=None):
     payload = {
@@ -133,6 +133,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
