@@ -37,7 +37,10 @@ TRIGGER_KEYWORDS_USER = [
 TRIGGER_KEYWORDS_BOT = [
     "our customer executive will contact you soon",
     "executive will contact you",
-    "we will call you soon"
+    "we will call you soon",
+    "Cityvibes team",
+    "reach out to you shortly",
+    "8290432222"
 ]
 
 def send_whatsapp_message(phone_number: str, message: str):
@@ -179,6 +182,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
