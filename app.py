@@ -30,6 +30,16 @@ SHEET_WEBHOOK_URL = os.environ["SHEET_WEBHOOK_URL"]
 # WhatsApp API endpoint
 WHATSAPP_API_URL = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
 
+# Trigger keywords
+TRIGGER_KEYWORDS_USER = [
+    "helpline", "help line", "contact number", "phone number", "customer care"
+]
+TRIGGER_KEYWORDS_BOT = [
+    "our customer executive will contact you soon",
+    "executive will contact you",
+    "we will call you soon"
+]
+
 def send_whatsapp_message(phone_number: str, message: str):
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
@@ -100,6 +110,19 @@ def ask_openai(session_id: str, user_message: str):
     SESSION_CONTEXT[session_id] = context[-10:]  # Keep last 10 messages
     return reply
 
+def forward_chat_to_fixed_number(session_id):
+    FORWARD_TO_NUMBER = "918000502897"
+    chat_history = SESSION_CONTEXT.get(session_id, [])
+    if not chat_history:
+        return
+    transcript_lines = []
+    for msg in chat_history:
+        role = "User" if msg["role"] == "user" else "Bot"
+        transcript_lines.append(f"{role}: {msg['content']}")
+    transcript = "\n".join(transcript_lines)
+    send_whatsapp_message(FORWARD_TO_NUMBER, f"📩 Forwarded chat transcript:\n\n{transcript}")
+
+
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
     if request.method == "GET":
@@ -135,13 +158,17 @@ def webhook():
                 print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
                 log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
                 send_whatsapp_message(phone_number, reply)
+
+                # Trigger check
+                if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
+                   any(k in reply.lower() for k in TRIGGER_KEYWORDS_BOT):
+                    forward_chat_to_fixed_number(session_id)
                 return "OK", 200
             else:
                 return "OK", 200
 
         except Exception as e:
             return jsonify({"error": str(e)}), 400
-
 
 
 # Endpoint for webhook verification (optional if using WhatsApp validation)
@@ -152,6 +179,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
