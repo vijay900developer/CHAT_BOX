@@ -214,7 +214,7 @@ def webhook():
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
                    any(k in reply.lower() for k in TRIGGER_KEYWORDS_BOT):
-                    forward_summary_to_fixed_number(session_id)
+                    forward_summary_to_fixed_number(session_id,phone_number)
                 return "OK", 200
             else:
                 return "OK", 200
@@ -231,6 +231,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
