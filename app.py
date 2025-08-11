@@ -113,17 +113,66 @@ def ask_openai(session_id: str, user_message: str):
     SESSION_CONTEXT[session_id] = context[-10:]  # Keep last 10 messages
     return reply
 
-def forward_chat_to_fixed_number(session_id):
+def summarize_chat_with_openai(chat_history):
+    """Generate a short summary of the customer's query."""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "Summarize the customer's query in 2-3 sentences."},
+                *chat_history
+            ],
+            temperature=0.3,
+            max_tokens=100
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ Summary generation failed:", e)
+        return "Summary not available."
+
+
+def extract_number_with_openai(chat_history):
+    """Extract phone number from chat history if mentioned by user."""
+    try:
+        combined_text = "\n".join([msg["content"] for msg in chat_history if msg["role"] == "user"])
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "Extract only the phone number mentioned by the customer. If none, respond with 'None'."},
+                {"role": "user", "content": combined_text}
+            ],
+            temperature=0.2,
+            max_tokens=10
+        )
+        num = response.choices[0].message.content.strip()
+        return None if num.lower() == "none" else num
+    except Exception as e:
+        print("❌ Number extraction failed:", e)
+        return None
+
+
+def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
+    """Forward chat summary + contact to CRM fixed number."""
     FORWARD_TO_NUMBER = "918000502897"
     chat_history = SESSION_CONTEXT.get(session_id, [])
     if not chat_history:
         return
-    transcript_lines = []
-    for msg in chat_history:
-        role = "User" if msg["role"] == "user" else "Bot"
-        transcript_lines.append(f"{role}: {msg['content']}")
-    transcript = "\n".join(transcript_lines)
-    send_whatsapp_message(FORWARD_TO_NUMBER, f"📩 Forwarded chat transcript:\n\n{transcript}")
+
+    summary = summarize_chat_with_openai(chat_history)
+    customer_name = extract_name_with_openai("\n".join([m["content"] for m in chat_history if m["role"] == "user"]))
+    customer_number = extract_number_with_openai(chat_history)
+
+    if not customer_number:
+        customer_number = user_whatsapp_number  # fallback to WhatsApp sender number
+
+    message = (
+        f"📩 Customer Query Summary:\n{summary}\n\n"
+        f"👤 Name: {customer_name or 'Not provided'}\n"
+        f"📞 Contact: {customer_number}"
+    )
+
+    send_whatsapp_message(FORWARD_TO_NUMBER, message)
+
 
 
 @app.route("/webhook", methods=["GET", "POST"])
@@ -165,7 +214,7 @@ def webhook():
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
                    any(k in reply.lower() for k in TRIGGER_KEYWORDS_BOT):
-                    forward_chat_to_fixed_number(session_id)
+                    forward_summary_to_fixed_number(session_id)
                 return "OK", 200
             else:
                 return "OK", 200
@@ -182,6 +231,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
