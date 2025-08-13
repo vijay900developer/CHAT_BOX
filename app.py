@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 from openai import OpenAI
 import logging
+import json
 from colorama import Fore, Style, init
 import os
 from datetime import datetime
@@ -12,6 +13,8 @@ init(autoreset=True)
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 WHATSAPP_TOKEN = os.environ["WHATSAPP_TOKEN"]
 PHONE_NUMBER_ID = os.environ["PHONE_NUMBER_ID"]
+SALES_SHEET_URL = os.environ.get["SALES_SHEET_URL"]
+ADMIN_NUMBERS = os.environ.get["ADMIN_NUMBERS", ""].split(",")  # e.g. "919999999999,918888888888"
 
 
 app = Flask(__name__)
@@ -23,6 +26,10 @@ SESSION_CONTEXT = {}
 # Assistant system prompt
 with open("system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
+
+# Assistant Personal-Prompt
+with open("personal_prompt.txt", "r", encoding="utf-8") as f:
+    PERSONAL_PROMPT = f.read()
 
 # Google Sheet Web App URL (replace with your actual deployment URL)
 SHEET_WEBHOOK_URL = os.environ["SHEET_WEBHOOK_URL"]
@@ -62,6 +69,40 @@ def send_whatsapp_message(phone_number: str, message: str):
         requests.post(WHATSAPP_API_URL, json=payload, headers=headers, timeout=10)
     except Exception as e:
         print("❌ Failed to send WhatsApp message:", e)
+
+def fetch_sales_data():
+    try:
+        return requests.get(SALES_SHEET_URL, timeout=10).json()
+    except Exception as e:
+        return {"error": str(e)}
+        
+# =======================
+# Sales AI Function
+# =======================
+def ask_sales_ai(user_message):
+    try:
+        sales_data = requests.get(SALES_SHEET_URL, timeout=10).json()
+
+        ai_prompt = (
+            f"{PERSONAL_PROMPT}\n\n"
+            f"Sales Data:\n{json.dumps(sales_data, indent=2)}\n\n"
+            f"Question: {user_message}"
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful sales analytics assistant."},
+                {"role": "user", "content": ai_prompt}
+            ],
+            temperature=0,
+            max_tokens=500
+        )
+
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ Sales AI error:", e)
+        return "Sorry, I couldn't fetch or analyze the sales data."
 
 def extract_name_with_openai(user_message):
     try:
@@ -202,14 +243,25 @@ def webhook():
                 text = message_data['text']['body']
                 session_id = phone_number
 
-                print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
-                user_name = extract_name_with_openai(text)
-                log_to_google_sheet(phone_number, "User", text, name=user_name)
+                # ✅ If message is from ADMIN_NUMBER → Personal sales bot
+                if phone_number in ADMIN_NUMBERS:
+                    sales_data = fetch_sales_data()
+                    if "error" in sales_data:
+                        reply = f"❌ Could not fetch sales data: {sales_data['error']}"
+                    else:
+                        # AI gets sales data + user query
+                        reply = ask_sales_ai(text)
+                        send_whatsapp_message(phone_number, reply)
+                        return "OK", 200
+                else: 
+                     print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
+                     user_name = extract_name_with_openai(text)
+                     log_to_google_sheet(phone_number, "User", text, name=user_name)
 
-                reply = ask_openai(session_id, text)
-                print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
-                log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
-                send_whatsapp_message(phone_number, reply)
+                     reply = ask_openai(session_id, text)
+                     print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
+                     log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
+                     send_whatsapp_message(phone_number, reply)
 
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
@@ -231,6 +283,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
