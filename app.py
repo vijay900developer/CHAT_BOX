@@ -13,8 +13,8 @@ init(autoreset=True)
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 WHATSAPP_TOKEN = os.environ["WHATSAPP_TOKEN"]
 PHONE_NUMBER_ID = os.environ["PHONE_NUMBER_ID"]
-SALES_SHEET_URL = os.environ.get["SALES_SHEET_URL"]
-ADMIN_NUMBERS = os.environ.get["ADMIN_NUMBERS", ""].split(",")  # e.g. "919999999999,918888888888"
+SALES_SHEET_URL = os.environ["SALES_SHEET_URL"]
+ADMIN_NUMBERS = os.environ["ADMIN_NUMBERS", ""].split(",")  # e.g. "919999999999,918888888888"
 
 
 app = Flask(__name__)
@@ -283,6 +283,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
