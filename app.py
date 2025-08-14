@@ -77,6 +77,17 @@ def fetch_sales_data():
     except Exception as e:
         return {"error": str(e)}
 
+def normalize_date(date_str):
+    """
+    Parse a date string (dd/mm/yyyy) into datetime.date
+    """
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
+    except ValueError:
+        return None
+
 def filter_sales_data(sales_data, user_message):
     """
     Filter sales data based on keywords or date mentioned in the user message.
@@ -109,37 +120,25 @@ def calculate_sales_total(sales_data, date=None, showroom=None):
     total = 0
     filtered_rows = []
 
+    query_date_norm = normalize_date(date)
+
     for row in sales_data:
-        row_date = str(row.get("Bill_Date")).strip()  # ensure string & trim
-        row_showroom = row.get("Showroom")
+        row_date_norm = normalize_date(str(row.get("Bill_Date")))
+        row_showroom = str(row.get("Showroom")).strip()
         amount = row.get("Net_Amount", 0)
 
-        # Ensure amount is numeric
         try:
             amount = float(amount)
         except:
             amount = 0
 
-        # Normalize dates to dd/mm/yyyy before comparing
-        if date:
-            try:
-                row_date_norm = datetime.strptime(row_date, "%d/%m/%Y").strftime("%d/%m/%Y")
-                query_date_norm = datetime.strptime(date, "%d/%m/%Y").strftime("%d/%m/%Y")
-            except:
-                row_date_norm = row_date
-                query_date_norm = date
-        else:
-            row_date_norm = row_date
-            query_date_norm = None
-
+        # ✅ now both sides are datetime.date, so comparison will work
         if (not query_date_norm or row_date_norm == query_date_norm) and \
            (not showroom or row_showroom.lower() == showroom.lower()):
             total += amount
             filtered_rows.append(row)
 
     return total, filtered_rows
-
-
 
 # =======================
 # Sales AI Function
@@ -370,6 +369,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
