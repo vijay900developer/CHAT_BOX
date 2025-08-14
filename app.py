@@ -327,12 +327,13 @@ def webhook():
 
                 # ✅ If message is from ADMIN_NUMBER → Personal sales bot
                 if phone_number in ADMIN_NUMBERS:
+                    logging.info(f"👑 Admin query received from {phone_number}")
                     sales_data = fetch_sales_data()
                     if "error" in sales_data:
                         reply = f"❌ Could not fetch sales data: {sales_data['error']}"
                     else:
                         # AI gets sales data + user query
-                        reply = ask_sales_ai(text)
+                        reply = ask_sales_ai(text,sales_data)
                         logging.info(f"🤖 Reply: {reply}")
                         send_whatsapp_message(phone_number, reply)
                         return "OK", 200
@@ -366,6 +367,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
