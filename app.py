@@ -5,7 +5,7 @@ import logging
 import json
 from colorama import Fore, Style, init
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # or logging.CRITICAL to suppress almost everything
 # 🎨 Enable colored output
@@ -75,6 +75,34 @@ def fetch_sales_data():
         return requests.get(SALES_SHEET_URL, timeout=10).json()
     except Exception as e:
         return {"error": str(e)}
+
+def filter_sales_data(sales_data, user_message):
+    """
+    Filter sales data based on keywords or date mentioned in the user message.
+    Example: if user asks 'sales on 12/08/2025', only return those rows.
+    """
+
+    filtered = sales_data  # default = full data
+
+    # Check if message contains a specific date
+    try:
+        for token in user_message.split():
+            try:
+                # Try to parse dd/mm/yyyy format
+                query_date = datetime.strptime(token, "%d/%m/%Y").date()
+                filtered = [row for row in sales_data if row.get("Bill_Date") == token]
+                break
+            except ValueError:
+                continue
+    except Exception:
+        pass
+
+    # Example: filter for "yesterday"
+    if "yesterday" in user_message.lower():
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d/%m/%Y")
+        filtered = [row for row in sales_data if row.get("Bill_Date") == yesterday]
+
+    return filtered
         
 # =======================
 # Sales AI Function
@@ -83,9 +111,12 @@ def ask_sales_ai(user_message):
     try:
         sales_data = requests.get(SALES_SHEET_URL, timeout=10).json()
 
+        # ✅ Filter sales before sending to OpenAI
+        filtered_data = filter_sales_data(sales_data, user_message)
+
         ai_prompt = (
             f"{PERSONAL_PROMPT}\n\n"
-            f"Sales Data:\n{json.dumps(sales_data, indent=2)}\n\n"
+            f"Here is the relevant filtered sales data:\n{json.dumps(filtered_data, indent=2)}\n\n"
             f"Question: {user_message}"
         )
 
@@ -103,6 +134,7 @@ def ask_sales_ai(user_message):
     except Exception as e:
         print("❌ Sales AI error:", e)
         return "Sorry, I couldn't fetch or analyze the sales data."
+
 
 def extract_name_with_openai(user_message):
     try:
@@ -283,6 +315,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
