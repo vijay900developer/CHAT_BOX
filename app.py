@@ -103,7 +103,6 @@ def extract_filters(user_message):
     filters = json.loads(response.choices[0].message.content.strip())
     return filters
 
-from dateutil import parser
 
 def normalize_date(date_text):
     if not date_text:
@@ -142,6 +141,29 @@ def apply_filters(sales_data, filters):
             filtered_rows.append(row)
 
     return total, filtered_rows
+def calculate_sales_total(filters, sales_data):
+    """
+    Apply filters (date, showroom, product etc.) on sales_data
+    and return the total Net_Amount.
+    """
+    try:
+        total = 0
+        for row in sales_data:
+            match = True
+            for key, value in filters.items():
+                if key in row:
+                    # Normalize both to string for comparison
+                    if str(row[key]).lower() != str(value).lower():
+                        match = False
+                        break
+            if match:
+                total += float(row.get("Net_Amount", 0))
+        return total
+    except Exception as e:
+        import logging
+        logging.error(f"❌ Error in calculate_sales_total: {e}")
+        return 0
+
 
 def ask_sales_ai(user_query, sales_data):
     try:
@@ -367,6 +389,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
