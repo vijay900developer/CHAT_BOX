@@ -77,117 +77,98 @@ def fetch_sales_data():
     except Exception as e:
         return {"error": str(e)}
 
-def normalize_date(date_str):
+def extract_filters(user_message):
     """
-    Parse a date string (dd/mm/yyyy) into datetime.date
+    Use AI to extract filters (date, showroom, product) from user message.
     """
-    if not date_str:
+    prompt = f"""
+    You are an assistant that extracts filters from sales queries.
+    User message: "{user_message}"
+
+    Return a JSON with possible keys:
+    - "date" (string in dd/mm/yyyy if exact date, or natural text like "yesterday", "12 August", "last month")
+    - "showroom" (string like "Bikaner", "Jaipur", etc. or null)
+    - "product" (string like "Blazer", "Kurta", etc. or null)
+
+    If something is not mentioned, keep it null.
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+
+    filters = json.loads(response.choices[0].message.content.strip())
+    return filters
+
+from dateutil import parser
+
+def normalize_date(date_text):
+    if not date_text:
         return None
-    try:
-        return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
-    except ValueError:
-        return None
+    date_text = date_text.lower().strip()
 
-def filter_sales_data(sales_data, user_message):
-    """
-    Filter sales data based on keywords or date mentioned in the user message.
-    Example: if user asks 'sales on 12/08/2025', only return those rows.
-    """
+    if date_text == "yesterday":
+        return (datetime.now() - timedelta(days=1)).strftime("%d/%m/%Y")
+    elif date_text == "today":
+        return datetime.now().strftime("%d/%m/%Y")
+    else:
+        try:
+            parsed = parser.parse(date_text, dayfirst=True)
+            return parsed.strftime("%d/%m/%Y")
+        except:
+            return None
 
-    filtered = sales_data  # default = full data
+def apply_filters(sales_data, filters):
+    query_date = normalize_date(filters.get("date"))
+    showroom = filters.get("showroom")
+    product = filters.get("product")
 
-    # Check if message contains a specific date
-    try:
-        for token in user_message.split():
-            try:
-                # Try to parse dd/mm/yyyy format
-                query_date = datetime.strptime(token, "%d/%m/%Y").date()
-                filtered = [row for row in sales_data if row.get("Bill_Date") == token]
-                break
-            except ValueError:
-                continue
-    except Exception:
-        pass
-
-    # Example: filter for "yesterday"
-    if "yesterday" in user_message.lower():
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%d/%m/%Y")
-        filtered = [row for row in sales_data if row.get("Bill_Date") == yesterday]
-
-    return filtered
-
-def calculate_sales_total(sales_data, date=None, showroom=None):
-    total = 0
     filtered_rows = []
-
-    query_date_norm = normalize_date(date)
+    total = 0
 
     for row in sales_data:
-        row_date_norm = normalize_date(str(row.get("Bill_Date")))
-        row_showroom = str(row.get("Showroom")).strip()
-        amount = row.get("Net_Amount", 0)
+        row_date = row.get("Bill_Date")
+        row_showroom = row.get("Showroom")
+        row_product = row.get("Product")
+        amount = float(row.get("Net_Amount", 0))
 
-        try:
-            amount = float(amount)
-        except:
-            amount = 0
-
-        # ✅ now both sides are datetime.date, so comparison will work
-        if (not query_date_norm or row_date_norm == query_date_norm) and \
-           (not showroom or row_showroom.lower() == showroom.lower()):
+        if (not query_date or row_date == query_date) \
+           and (not showroom or row_showroom.lower() == showroom.lower()) \
+           and (not product or row_product.lower() == product.lower()):
             total += amount
             filtered_rows.append(row)
 
     return total, filtered_rows
 
-# =======================
-# Sales AI Function
-# =======================
-
 def ask_sales_ai(user_message):
     try:
-        sales_data = requests.get(SALES_SHEET_URL, timeout=10).json()
+        sales_data = requests.get(SALES_SHEET_URL).json()
 
-        # ✅ Step 1: filter rows based on user message
-        filtered_data = filter_sales_data(sales_data, user_message)
+        filters = extract_filters(user_message)
+        total, rows = apply_filters(sales_data, filters)
 
-        # ✅ Step 2: extract query info
-        date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", user_message)
-        showroom_match = None
-        for showroom in ["Bikaner", "Jaipur", "Delhi"]:  # add your showrooms
-            if showroom.lower() in user_message.lower():
-                showroom_match = showroom
-                break
+        ai_prompt = f"""
+        User asked: {user_message}
+        Filters applied: {filters}
+        Matching entries: {json.dumps(rows, indent=2)}
+        Total sales = ₹{total}
 
-        query_date = date_match.group(1) if date_match else None
-
-        # ✅ Step 3: calculate on filtered dataset
-        total, rows = calculate_sales_total(filtered_data, date=query_date, showroom=showroom_match)
-
-        # ✅ Step 4: send only relevant info to AI
-        ai_prompt = (
-            f"You are a sales assistant.\n\n"
-            f"User asked: {user_message}\n"
-            f"Here are the matching sales entries: {json.dumps(rows, indent=2)}\n\n"
-            f"Total sales = ₹{total}\n"
-            f"Please explain the result in a clear, human-friendly way."
-        )
+        Explain the result in a clear way for the user.
+        """
 
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful sales assistant."},
-                {"role": "user", "content": ai_prompt}
-            ],
-            temperature=0,
-            max_tokens=400
+            messages=[{"role": "user", "content": ai_prompt}],
+            temperature=0
         )
-
         return response.choices[0].message.content.strip()
 
     except Exception as e:
         print("❌ Sales AI error:", e)
         return "Sorry, I couldn't fetch or analyze the sales data."
+
 
 
 def extract_name_with_openai(user_message):
@@ -369,6 +350,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
