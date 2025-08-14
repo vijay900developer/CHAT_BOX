@@ -313,6 +313,7 @@ def webhook():
 
     if request.method == "POST":
         data = request.get_json()
+        logging.info(f"📩 Incoming data: {data}")
         try:
             changes = data['entry'][0]['changes'][0]['value']
             
@@ -322,6 +323,7 @@ def webhook():
                 phone_number = message_data['from']
                 text = message_data['text']['body']
                 session_id = phone_number
+                logging.info(f"👤 From: {phone_number}, Message: {text}")
 
                 # ✅ If message is from ADMIN_NUMBER → Personal sales bot
                 if phone_number in ADMIN_NUMBERS:
@@ -331,6 +333,7 @@ def webhook():
                     else:
                         # AI gets sales data + user query
                         reply = ask_sales_ai(text)
+                        logging.info(f"🤖 Reply: {reply}")
                         send_whatsapp_message(phone_number, reply)
                         return "OK", 200
                 else: 
@@ -363,6 +366,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
