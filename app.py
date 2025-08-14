@@ -110,7 +110,7 @@ def calculate_sales_total(sales_data, date=None, showroom=None):
     filtered_rows = []
 
     for row in sales_data:
-        row_date = row.get("Bill_Date")
+        row_date = str(row.get("Bill_Date")).strip()  # ensure string & trim
         row_showroom = row.get("Showroom")
         amount = row.get("Net_Amount", 0)
 
@@ -120,11 +120,25 @@ def calculate_sales_total(sales_data, date=None, showroom=None):
         except:
             amount = 0
 
-        if (not date or row_date == date) and (not showroom or row_showroom.lower() == showroom.lower()):
+        # Normalize dates to dd/mm/yyyy before comparing
+        if date:
+            try:
+                row_date_norm = datetime.strptime(row_date, "%d/%m/%Y").strftime("%d/%m/%Y")
+                query_date_norm = datetime.strptime(date, "%d/%m/%Y").strftime("%d/%m/%Y")
+            except:
+                row_date_norm = row_date
+                query_date_norm = date
+        else:
+            row_date_norm = row_date
+            query_date_norm = None
+
+        if (not query_date_norm or row_date_norm == query_date_norm) and \
+           (not showroom or row_showroom.lower() == showroom.lower()):
             total += amount
             filtered_rows.append(row)
 
     return total, filtered_rows
+
 
 
 # =======================
@@ -356,6 +370,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
