@@ -103,7 +103,29 @@ def filter_sales_data(sales_data, user_message):
         filtered = [row for row in sales_data if row.get("Bill_Date") == yesterday]
 
     return filtered
-        
+
+def calculate_sales_total(sales_data, date=None, showroom=None):
+    total = 0
+    filtered_rows = []
+
+    for row in sales_data:
+        row_date = row.get("Bill_Date")
+        row_showroom = row.get("Showroom")
+        amount = row.get("Net_Amount", 0)
+
+        # Ensure amount is numeric
+        try:
+            amount = float(amount)
+        except:
+            amount = 0
+
+        if (not date or row_date == date) and (not showroom or row_showroom.lower() == showroom.lower()):
+            total += amount
+            filtered_rows.append(row)
+
+    return total, filtered_rows
+
+
 # =======================
 # Sales AI Function
 # =======================
@@ -111,23 +133,36 @@ def ask_sales_ai(user_message):
     try:
         sales_data = requests.get(SALES_SHEET_URL, timeout=10).json()
 
-        # ✅ Filter sales before sending to OpenAI
-        filtered_data = filter_sales_data(sales_data, user_message)
+        # Extract query info (basic version)
+        date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", user_message)
+        showroom_match = None
+        for showroom in ["Bikaner", "Jaipur", "Delhi"]:  # add your showrooms
+            if showroom.lower() in user_message.lower():
+                showroom_match = showroom
+                break
 
+        query_date = date_match.group(1) if date_match else None
+
+        # ✅ Calculate total in Python
+        total, rows = calculate_sales_total(sales_data, date=query_date, showroom=showroom_match)
+
+        # Only send summarized info to AI
         ai_prompt = (
-            f"{PERSONAL_PROMPT}\n\n"
-            f"Here is the relevant filtered sales data:\n{json.dumps(filtered_data, indent=2)}\n\n"
-            f"Question: {user_message}"
+            f"You are a sales assistant.\n\n"
+            f"User asked: {user_message}\n"
+            f"Here are the matching sales entries: {json.dumps(rows, indent=2)}\n\n"
+            f"Total sales = ₹{total}\n"
+            f"Please explain the result in a clear, human-friendly way."
         )
 
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful sales analytics assistant."},
+                {"role": "system", "content": "You are a helpful sales assistant."},
                 {"role": "user", "content": ai_prompt}
             ],
             temperature=0,
-            max_tokens=500
+            max_tokens=400
         )
 
         return response.choices[0].message.content.strip()
@@ -315,6 +350,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
