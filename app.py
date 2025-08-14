@@ -143,32 +143,44 @@ def apply_filters(sales_data, filters):
 
     return total, filtered_rows
 
-def ask_sales_ai(user_message):
+def ask_sales_ai(user_query, sales_data):
     try:
-        sales_data = requests.get(SALES_SHEET_URL).json()
-
-        filters = extract_filters(user_message)
-        total, rows = apply_filters(sales_data, filters)
-
-        ai_prompt = f"""
-        User asked: {user_message}
-        Filters applied: {filters}
-        Matching entries: {json.dumps(rows, indent=2)}
-        Total sales = ₹{total}
-
-        Explain the result in a clear way for the user.
-        """
+        # Step 1: Ask AI to extract filters
+        messages = [
+            {"role": "system", "content": """
+You are a parser that extracts filters from the user query.
+Always respond ONLY in valid JSON. 
+Valid keys: "date", "month", "showroom", "product".
+Example:
+{"date": "12/08/2025", "showroom": "Bikaner"}
+"""}, 
+            {"role": "user", "content": user_query}
+        ]
 
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": ai_prompt}],
+            messages=messages,
             temperature=0
         )
-        return response.choices[0].message.content.strip()
+
+        ai_content = response.choices[0].message.content.strip()
+        logging.info(f"AI raw response: {ai_content}")  # ✅ See in Render logs
+
+        # Step 2: Parse JSON safely
+        try:
+            filters = json.loads(ai_content)
+        except json.JSONDecodeError:
+            logging.error(f"Invalid JSON from AI: {ai_content}")
+            return "Sorry, I couldn’t understand your request."
+
+        # Step 3: Apply filters in Python
+        total_sales = calculate_sales_total(filters, sales_data)
+
+        return f"Total sales: {total_sales}"
 
     except Exception as e:
-        print("❌ Sales AI error:", e)
-        return "Sorry, I couldn't fetch or analyze the sales data."
+        logging.error(f"Sales AI error: {e}")
+        return "Sorry, I could not fetch or analyze the sales data."
 
 
 
@@ -351,6 +363,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
