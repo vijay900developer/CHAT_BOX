@@ -129,11 +129,15 @@ def calculate_sales_total(sales_data, date=None, showroom=None):
 # =======================
 # Sales AI Function
 # =======================
+
 def ask_sales_ai(user_message):
     try:
         sales_data = requests.get(SALES_SHEET_URL, timeout=10).json()
 
-        # Extract query info (basic version)
+        # ✅ Step 1: filter rows based on user message
+        filtered_data = filter_sales_data(sales_data, user_message)
+
+        # ✅ Step 2: extract query info
         date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", user_message)
         showroom_match = None
         for showroom in ["Bikaner", "Jaipur", "Delhi"]:  # add your showrooms
@@ -143,10 +147,10 @@ def ask_sales_ai(user_message):
 
         query_date = date_match.group(1) if date_match else None
 
-        # ✅ Calculate total in Python
-        total, rows = calculate_sales_total(sales_data, date=query_date, showroom=showroom_match)
+        # ✅ Step 3: calculate on filtered dataset
+        total, rows = calculate_sales_total(filtered_data, date=query_date, showroom=showroom_match)
 
-        # Only send summarized info to AI
+        # ✅ Step 4: send only relevant info to AI
         ai_prompt = (
             f"You are a sales assistant.\n\n"
             f"User asked: {user_message}\n"
@@ -166,6 +170,7 @@ def ask_sales_ai(user_message):
         )
 
         return response.choices[0].message.content.strip()
+
     except Exception as e:
         print("❌ Sales AI error:", e)
         return "Sorry, I couldn't fetch or analyze the sales data."
@@ -350,6 +355,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
