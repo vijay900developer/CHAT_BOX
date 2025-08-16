@@ -207,29 +207,15 @@ def webhook():
                 phone_number = message_data['from']
                 text = message_data['text']['body']
                 session_id = phone_number
-                logging.info(f"👤 From: {phone_number}, Message: {text}")
+                
+                print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
+                user_name = extract_name_with_openai(text)
+                log_to_google_sheet(phone_number, "User", text, name=user_name)
 
-                # ✅ If message is from ADMIN_NUMBER → Personal sales bot
-                if phone_number in ADMIN_NUMBERS:
-                    logging.info(f"👑 Admin query received from {phone_number}")
-                    sales_data = fetch_sales_data()
-                    if "error" in sales_data:
-                        reply = f"❌ Could not fetch sales data: {sales_data['error']}"
-                    else:
-                        # AI gets sales data + user query
-                        reply = ask_sales_ai(text,sales_data)
-                        logging.info(f"🤖 Reply: {reply}")
-                        send_whatsapp_message(phone_number, reply)
-                        return "OK", 200
-                else: 
-                     print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
-                     user_name = extract_name_with_openai(text)
-                     log_to_google_sheet(phone_number, "User", text, name=user_name)
-
-                     reply = ask_openai(session_id, text)
-                     print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
-                     log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
-                     send_whatsapp_message(phone_number, reply)
+                reply = ask_openai(session_id, text)
+                print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
+                log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
+                send_whatsapp_message(phone_number, reply)
 
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
@@ -251,6 +237,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
