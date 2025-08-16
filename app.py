@@ -15,9 +15,7 @@ init(autoreset=True)
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 WHATSAPP_TOKEN = os.environ["WHATSAPP_TOKEN"]
 PHONE_NUMBER_ID = os.environ["PHONE_NUMBER_ID"]
-SALES_SHEET_URL = os.environ["SALES_SHEET_URL"]
-ADMIN_NUMBERS = os.environ.get("ADMIN_NUMBERS", "").split(",")  # e.g. "919999999999,918888888888"
-
+FIX_PHONE_NUMBER = os.environ["FIX_PHONE_NUMBER"]
 
 app = Flask(__name__)
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -29,11 +27,8 @@ SESSION_CONTEXT = {}
 with open("system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
-# Assistant Personal-Prompt
-with open("personal_prompt.txt", "r", encoding="utf-8") as f:
-    PERSONAL_PROMPT = f.read()
 
-# Google Sheet Web App URL (replace with your actual deployment URL)
+# Google Sheet Web App URL 
 SHEET_WEBHOOK_URL = os.environ["SHEET_WEBHOOK_URL"]
 
 # WhatsApp API endpoint
@@ -71,139 +66,6 @@ def send_whatsapp_message(phone_number: str, message: str):
         requests.post(WHATSAPP_API_URL, json=payload, headers=headers, timeout=10)
     except Exception as e:
         print("❌ Failed to send WhatsApp message:", e)
-
-def fetch_sales_data():
-    try:
-        return requests.get(SALES_SHEET_URL, timeout=10).json()
-    except Exception as e:
-        return {"error": str(e)}
-
-def extract_filters(user_message):
-    """
-    Use AI to extract filters (date, showroom, product) from user message.
-    """
-    prompt = f"""
-    You are an assistant that extracts filters from sales queries.
-    User message: "{user_message}"
-
-    Return a JSON with possible keys:
-    - "date" (string in dd/mm/yyyy if exact date, or natural text like "yesterday", "12 August", "last month")
-    - "showroom" (string like "Bikaner", "Jaipur", etc. or null)
-    - "product" (string like "Blazer", "Kurta", etc. or null)
-
-    If something is not mentioned, keep it null.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-
-    filters = json.loads(response.choices[0].message.content.strip())
-    return filters
-
-
-def normalize_date(date_text):
-    if not date_text:
-        return None
-    date_text = date_text.lower().strip()
-
-    if date_text == "yesterday":
-        return (datetime.now() - timedelta(days=1)).strftime("%d/%m/%Y")
-    elif date_text == "today":
-        return datetime.now().strftime("%d/%m/%Y")
-    else:
-        try:
-            parsed = parser.parse(date_text, dayfirst=True)
-            return parsed.strftime("%d/%m/%Y")
-        except:
-            return None
-
-def apply_filters(sales_data, filters):
-    query_date = normalize_date(filters.get("date"))
-    showroom = filters.get("showroom")
-    product = filters.get("product")
-
-    filtered_rows = []
-    total = 0
-
-    for row in sales_data:
-        row_date = row.get("Bill_Date")
-        row_showroom = row.get("Showroom")
-        row_product = row.get("Product")
-        amount = float(row.get("Net_Amount", 0))
-
-        if (not query_date or row_date == query_date) \
-           and (not showroom or row_showroom.lower() == showroom.lower()) \
-           and (not product or row_product.lower() == product.lower()):
-            total += amount
-            filtered_rows.append(row)
-
-    return total, filtered_rows
-def calculate_sales_total(filters, sales_data):
-    """
-    Apply filters (date, showroom, product etc.) on sales_data
-    and return the total Net_Amount.
-    """
-    try:
-        total = 0
-        for row in sales_data:
-            match = True
-            for key, value in filters.items():
-                if key in row:
-                    # Normalize both to string for comparison
-                    if str(row[key]).lower() != str(value).lower():
-                        match = False
-                        break
-            if match:
-                total += float(row.get("Net_Amount", 0))
-        return total
-    except Exception as e:
-        import logging
-        logging.error(f"❌ Error in calculate_sales_total: {e}")
-        return 0
-
-
-def ask_sales_ai(user_query, sales_data):
-    try:
-        # Step 1: Ask AI to extract filters
-        messages = [
-            {"role": "system", "content": """
-You are a parser that extracts filters from the user query.
-Always respond ONLY in valid JSON. 
-Valid keys: "date", "month", "showroom", "product".
-Example:
-{"date": "12/08/2025", "showroom": "Bikaner"}
-"""}, 
-            {"role": "user", "content": user_query}
-        ]
-
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=messages,
-            temperature=0
-        )
-
-        ai_content = response.choices[0].message.content.strip()
-        logging.info(f"AI raw response: {ai_content}")  # ✅ See in Render logs
-
-        # Step 2: Parse JSON safely
-        try:
-            filters = json.loads(ai_content)
-        except json.JSONDecodeError:
-            logging.error(f"Invalid JSON from AI: {ai_content}")
-            return "Sorry, I couldn’t understand your request."
-
-        # Step 3: Apply filters in Python
-        total_sales = calculate_sales_total(filters, sales_data)
-
-        return f"Total sales: {total_sales}"
-
-    except Exception as e:
-        logging.error(f"Sales AI error: {e}")
-        return "Sorry, I could not fetch or analyze the sales data."
-
 
 
 def extract_name_with_openai(user_message):
@@ -296,7 +158,7 @@ def extract_number_with_openai(chat_history):
 
 def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
     """Forward chat summary + contact to CRM fixed number."""
-    FORWARD_TO_NUMBER = "918000502897"
+    FORWARD_TO_NUMBER = FIX_PHONE_NUMBER
     chat_history = SESSION_CONTEXT.get(session_id, [])
     if not chat_history:
         return
@@ -389,6 +251,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
