@@ -11,3 +11,6 @@ services:
         fromEnvVar: WHATSAPP_TOKEN
       - key: PHONE_NUMBER_ID
         fromEnvVar: PHONE_NUMBER_ID
+      - key: FIX_PHONE_NUMBER
+        fromEnvVar: FIX_PHONE_NUMBER
+
