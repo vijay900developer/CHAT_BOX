@@ -221,7 +221,26 @@ def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
 
     send_whatsapp_message(FORWARD_TO_NUMBER, message)
     
-def log_summary_to_google_sheet(phone_number, name=None, address=None, summary=""):
+def log_summary_to_google_sheet(session_id, phone_number, summary=None):
+    """
+    Log chat summary to Google Sheet.
+    If summary is not provided, generate it from chat_history in SESSION_CONTEXT.
+    """
+    chat_history = SESSION_CONTEXT.get(session_id, [])
+    
+    if not summary and chat_history:
+        # Generate summary from full chat history
+        summary = summarize_chat_with_openai(chat_history)
+        name = extract_name_with_openai(
+            "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
+        )
+        address = extract_address_with_openai(
+            "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
+        )
+    else:
+        name = ""
+        address = ""
+
     payload = {
         "sheet": "Chat_Summary",
         "date": datetime.now().strftime("%d-%m-%Y"),
@@ -229,12 +248,14 @@ def log_summary_to_google_sheet(phone_number, name=None, address=None, summary="
         "phone_number": phone_number,
         "name": name or "",
         "address": address or "",
-        "summary": summary
+        "summary": summary or ""
     }
+
     try:
         requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
     except Exception as e:
         print("⚠️ Failed to log chat summary to Google Sheet:", e)
+
 
 def start_inactivity_watcher():
     def watcher():
@@ -343,6 +364,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
