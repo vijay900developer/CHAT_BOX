@@ -26,6 +26,8 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # In-memory context store (for demo only)
 SESSION_CONTEXT = {}
+LAST_MESSAGE_TIME = {}
+INACTIVITY_TIMEOUT = 120
 
 # Assistant system prompt
 with open("system_prompt.txt", "r", encoding="utf-8") as f:
@@ -318,15 +320,7 @@ def webhook():
                 chat_history.append({"role": "assistant", "content": reply})
                 SESSION_CONTEXT[session_id] = chat_history[-10:]  # Keep last 10 messages
 
-                # 4️⃣ Summarize chat and log summary
-                summary = summarize_chat_with_openai(chat_history)
-                log_summary_to_google_sheet(
-                    phone_number,
-                    name=customer_name,
-                    address=customer_address,
-                    summary=summary
-                )
-
+    
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
                    any(k in reply.lower() for k in TRIGGER_KEYWORDS_BOT):
@@ -345,8 +339,10 @@ def home():
     return "🤖 WhatsApp AI Chatbot is running!"
 
 if __name__ == "__main__":
+    start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
