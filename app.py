@@ -6,6 +6,8 @@ import json
 from colorama import Fore, Style, init
 import os
 import re
+import threading
+import time
 from datetime import datetime, timedelta
 from dateutil import parser
 log = logging.getLogger('werkzeug')
@@ -117,7 +119,7 @@ def extract_address_with_openai(user_message):
 
 def log_to_google_sheet(phone_number, sender, message, name=None, address=None):
     payload = {
-        
+        "sheet": "Chat_Log",
         "date": datetime.now().strftime("%d-%m-%Y"),
         "time": datetime.now().strftime("%H:%M:%S"),
         "phone_number": phone_number,
@@ -217,6 +219,7 @@ def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
     
 def log_summary_to_google_sheet(phone_number, name=None, address=None, summary=""):
     payload = {
+        "sheet": "Chat_Summary",
         "date": datetime.now().strftime("%d-%m-%Y"),
         "time": datetime.now().strftime("%H:%M:%S"),
         "phone_number": phone_number,
@@ -225,12 +228,34 @@ def log_summary_to_google_sheet(phone_number, name=None, address=None, summary="
         "summary": summary
     }
     try:
-        # You can either create a separate webhook URL for "Chat_Summary" sheet,
-        # or use the same SHEET_WEBHOOK_URL and modify Apps Script to accept 'summary' 
-        # and append to "Chat_Summary" if present
         requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
     except Exception as e:
         print("⚠️ Failed to log chat summary to Google Sheet:", e)
+
+def start_inactivity_watcher():
+    def watcher():
+        while True:
+            now = datetime.now()
+            for phone, last_time in list(LAST_MESSAGE_TIME.items()):
+                if (now - last_time).total_seconds() > INACTIVITY_TIMEOUT:
+                    try:
+                        context = SESSION_CONTEXT.get(phone, [])
+                        if context:
+                            summary = summarize_chat_with_openai(context)
+                            name = extract_name_with_openai(
+                                "\n".join([m["content"] for m in context if m["role"] == "user"])
+                            )
+                            address = extract_address_with_openai(
+                                "\n".join([m["content"] for m in context if m["role"] == "user"])
+                            )
+                            log_summary_to_google_sheet(phone, name=name, address=address, summary=summary)
+                            print(f"🕒 Auto-summarized chat for {phone}")
+                            LAST_MESSAGE_TIME.pop(phone, None)
+                            SESSION_CONTEXT.pop(phone, None)
+                    except Exception as e:
+                        print(f"⚠️ Error summarizing chat for {phone}: {e}")
+            time.sleep(30)
+    threading.Thread(target=watcher, daemon=True).start()
 
 
 @app.route("/webhook", methods=["GET", "POST"])
@@ -320,6 +345,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
