@@ -221,14 +221,16 @@ def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
 
     send_whatsapp_message(FORWARD_TO_NUMBER, message)
     
-def log_summary_to_google_sheet(session_id, phone_number, summary=None):
+def log_summary_to_google_sheet(session_id):
     """
     Log chat summary to Google Sheet.
     If summary is not provided, generate it from chat_history in SESSION_CONTEXT.
     """
     chat_history = SESSION_CONTEXT.get(session_id, [])
     
-    if not summary and chat_history:
+    if not chat_history:
+        print(f"⚠️ No chat history for {session_id}, skipping summary log.")
+        return
         # Generate summary from full chat history
         summary = summarize_chat_with_openai(chat_history)
         name = extract_name_with_openai(
@@ -237,9 +239,6 @@ def log_summary_to_google_sheet(session_id, phone_number, summary=None):
         address = extract_address_with_openai(
             "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
         )
-    else:
-        name = ""
-        address = ""
 
     payload = {
         "sheet": "Chat_Summary",
@@ -266,8 +265,7 @@ def start_inactivity_watcher():
                     try:
                         context = SESSION_CONTEXT.get(phone, [])
                         if context:
-                            summary = summarize_chat_with_openai(context)
-                            log_summary_to_google_sheet(session_id=phone, phone, summary=summary)
+                            log_summary_to_google_sheet(session_id=phone)
                             print(f"🕒 Auto-summarized chat for {phone}")
                             LAST_MESSAGE_TIME.pop(phone, None)
                             SESSION_CONTEXT.pop(phone, None)
@@ -358,6 +356,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
