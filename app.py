@@ -85,13 +85,44 @@ def extract_name_with_openai(user_message):
         print("❌ Name extraction failed:", e)
         return None
 
-def log_to_google_sheet(phone_number, sender, message, name=None):
+def extract_address_with_openai(user_message):
+    """
+    Extracts only the address from the user's message using OpenAI.
+    If no address is found, returns None.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract only the address mentioned in the user's message. "
+                        "If there is no address or it's unclear, respond strictly with 'None'. "
+                        "Address may include house number, street, area, city, or postal code."
+                    )
+                },
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.2,
+            max_tokens=30
+        )
+
+        address = response.choices[0].message.content.strip()
+        return address if address.lower() != "none" else None
+
+    except Exception as e:
+        print("❌ Address extraction failed:", e)
+        return None
+
+def log_to_google_sheet(phone_number, sender, message, name=None, address=None):
     payload = {
         
         "date": datetime.now().strftime("%d-%m-%Y"),
         "time": datetime.now().strftime("%H:%M:%S"),
         "phone_number": phone_number,
         "name": name or "",
+        "address": address or "",
         "sender": sender,  # "User" or "Bot"
         "message": message
     }
@@ -101,8 +132,10 @@ def log_to_google_sheet(phone_number, sender, message, name=None):
         print("⚠️ Failed to log to Google Sheet:", e)
 
 
-
 def ask_openai(session_id: str, user_message: str):
+    """
+    Generate a bot reply using OpenAI, keeping context in memory only.
+    """
     context = SESSION_CONTEXT.get(session_id, [])
     context.append({"role": "user", "content": user_message})
 
@@ -165,6 +198,9 @@ def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
 
     summary = summarize_chat_with_openai(chat_history)
     customer_name = extract_name_with_openai("\n".join([m["content"] for m in chat_history if m["role"] == "user"]))
+    customer_address = extract_address_with_openai(
+        "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
+    )
     customer_number = extract_number_with_openai(chat_history)
 
     if not customer_number:
@@ -173,11 +209,28 @@ def forward_summary_to_fixed_number(session_id, user_whatsapp_number):
     message = (
         f"📩 Customer Query Summary:\n{summary}\n\n"
         f"👤 Name: {customer_name or 'Not provided'}\n"
+        f"🏠 Address: {customer_address or 'Not provided'}\n"
         f"📞 Contact: {customer_number}"
     )
 
     send_whatsapp_message(FORWARD_TO_NUMBER, message)
-
+    
+def log_summary_to_google_sheet(phone_number, name=None, address=None, summary=""):
+    payload = {
+        "date": datetime.now().strftime("%d-%m-%Y"),
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "phone_number": phone_number,
+        "name": name or "",
+        "address": address or "",
+        "summary": summary
+    }
+    try:
+        # You can either create a separate webhook URL for "Chat_Summary" sheet,
+        # or use the same SHEET_WEBHOOK_URL and modify Apps Script to accept 'summary' 
+        # and append to "Chat_Summary" if present
+        requests.post(SHEET_WEBHOOK_URL, json=payload, timeout=5)
+    except Exception as e:
+        print("⚠️ Failed to log chat summary to Google Sheet:", e)
 
 
 @app.route("/webhook", methods=["GET", "POST"])
@@ -204,18 +257,48 @@ def webhook():
             # ✅ Only proceed if 'messages' exist
             if 'messages' in changes:
                 message_data = changes['messages'][0]
+                # 🛡️ Ignore echo/self or non-text messages
+                if (
+                    message_data.get("from") == PHONE_NUMBER_ID
+                    or message_data.get("from") == FIX_PHONE_NUMBER
+                ):
+                    print("⚠️ Ignoring self-sent or echo message.")
+                    return "OK", 200
+
+                if message_data.get("type") != "text":
+                    print("⚠️ Ignoring non-text message.")
+                    return "OK", 200
                 phone_number = message_data['from']
                 text = message_data['text']['body']
                 session_id = phone_number
                 
                 print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
-                user_name = extract_name_with_openai(text)
-                log_to_google_sheet(phone_number, "User", text, name=user_name)
+                customer_name = extract_name_with_openai(text)
+                chat_history = SESSION_CONTEXT.get(session_id, [])
+                customer_address = extract_address_with_openai(
+                    "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
+                )
+                log_to_google_sheet(phone_number, "User", text, name=customer_name, address=customer_address)
 
                 reply = ask_openai(session_id, text)
                 print(Fore.MAGENTA + "🤖 Bot:  " + Fore.GREEN + reply)
                 log_to_google_sheet(phone_number, "Bot", reply, name = "Bot")
                 send_whatsapp_message(phone_number, reply)
+
+                # ✅ Update chat_history with latest messages before summarizing
+                chat_history = SESSION_CONTEXT.get(session_id, [])
+                chat_history.append({"role": "user", "content": text})
+                chat_history.append({"role": "assistant", "content": reply})
+                SESSION_CONTEXT[session_id] = chat_history[-10:]  # Keep last 10 messages
+
+                # 4️⃣ Summarize chat and log summary
+                summary = summarize_chat_with_openai(chat_history)
+                log_summary_to_google_sheet(
+                    phone_number,
+                    name=customer_name,
+                    address=customer_address,
+                    summary=summary
+                )
 
                 # Trigger check
                 if any(k in text.lower() for k in TRIGGER_KEYWORDS_USER) or \
@@ -237,6 +320,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
