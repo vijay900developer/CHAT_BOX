@@ -10,6 +10,8 @@ import threading
 import time
 from datetime import datetime, timedelta
 from dateutil import parser
+LAST_MESSAGE_TIME = {}
+INACTIVITY_TIMEOUT = 120
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # or logging.CRITICAL to suppress almost everything
 # 🎨 Enable colored output
@@ -345,6 +347,7 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
