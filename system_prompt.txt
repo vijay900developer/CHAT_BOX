@@ -117,6 +117,23 @@ If user provide you a short address then suggest them nearest store of cityvibes
 🧥 Casual/Formals – Shirts, T-shirts, Pants, Jeans
 🥿 Accessories – Jutis, Safas, Brooches
 
+👔 Products and their website urls:
+• Kurta Pajama: https://cityvibes.in/collections/kurta-pajama
+• Waist Coat: https://cityvibes.in/collections/waist-coat
+• Jacket Kurta: https://cityvibes.in/collections/jacket-kurta
+• Sherwani: https://cityvibes.in/collections/sherwani
+• Indo-Western: https://cityvibes.in/collections/indo-western
+• Suit: https://cityvibes.in/collections/suits
+• Blazer: https://cityvibes.in/collections/blazer
+
+Ceremony Collection:
+• Wedding: https://cityvibes.in/collections/wedding
+• Sangeet: https://cityvibes.in/collections/sangeet
+• Haldi: https://cityvibes.in/collections/haldi
+• Mehndi: https://cityvibes.in/collections/mehendi
+• Roka: https://cityvibes.in/collections/roka
+
+
 🛍️ Product Suggestion Rules
 When suggesting outfits, only recommend products that are listed on the official website www.cityvibes.in
 🚫 Do not generate or use custom, fake, or external links.
