@@ -304,6 +304,7 @@ def webhook():
                 print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
                 customer_name = extract_name_with_openai(text)
                 chat_history = SESSION_CONTEXT.get(session_id, [])
+                LAST_MESSAGE_TIME[phone_number] = datetime.now()
                 customer_address = extract_address_with_openai(
                     "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
                 )
@@ -342,34 +343,6 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
