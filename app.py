@@ -267,13 +267,7 @@ def start_inactivity_watcher():
                         context = SESSION_CONTEXT.get(phone, [])
                         if context:
                             summary = summarize_chat_with_openai(context)
-                            name = extract_name_with_openai(
-                                "\n".join([m["content"] for m in context if m["role"] == "user"])
-                            )
-                            address = extract_address_with_openai(
-                                "\n".join([m["content"] for m in context if m["role"] == "user"])
-                            )
-                            log_summary_to_google_sheet(phone, name=name, address=address, summary=summary)
+                            log_summary_to_google_sheet(session_id=phone, phone, summary=summary)
                             print(f"🕒 Auto-summarized chat for {phone}")
                             LAST_MESSAGE_TIME.pop(phone, None)
                             SESSION_CONTEXT.pop(phone, None)
@@ -364,6 +358,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
