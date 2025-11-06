@@ -239,6 +239,7 @@ def log_summary_to_google_sheet(session_id):
         address = extract_address_with_openai(
             "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
         )
+        customer_number = extract_number_with_openai(chat_history)
 
     payload = {
         "sheet": "Chat_Summary",
@@ -356,6 +357,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
