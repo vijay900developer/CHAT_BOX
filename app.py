@@ -229,26 +229,21 @@ def log_summary_to_google_sheet(session_id):
     chat_history = SESSION_CONTEXT.get(session_id, [])
     
     if not chat_history:
-        print(f"⚠️ No chat history for {session_id}, skipping summary log.")
         return
-        # Generate summary from full chat history
-        summary = summarize_chat_with_openai(chat_history)
-        name = extract_name_with_openai(
-            "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
-        )
-        address = extract_address_with_openai(
-            "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
-        )
-        customer_number = extract_number_with_openai(chat_history)
+    # Generate summary from full chat history
+    user_text = "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
+    name = extract_name_with_openai(user_text) or ""
+    address = extract_address_with_openai(user_text) or ""
+    customer_number = extract_number_with_openai(chat_history) or session_id
 
     payload = {
         "sheet": "Chat_Summary",
         "date": datetime.now().strftime("%d-%m-%Y"),
         "time": datetime.now().strftime("%H:%M:%S"),
-        "phone_number": customer_number or "",
-        "name": name or "",
-        "address": address or "",
-        "summary": summary or ""
+        "phone_number": customer_number,
+        "name": name,
+        "address": address,
+        "summary": summary
     }
 
     try:
@@ -357,6 +352,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
