@@ -233,6 +233,7 @@ def log_summary_to_google_sheet(session_id):
         return
         # Generate summary from full chat history
         summary = summarize_chat_with_openai(chat_history)
+        customer_number = extract_number_with_openai(chat_history)
         name = extract_name_with_openai(
             "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
         )
@@ -244,7 +245,7 @@ def log_summary_to_google_sheet(session_id):
         "sheet": "Chat_Summary",
         "date": datetime.now().strftime("%d-%m-%Y"),
         "time": datetime.now().strftime("%H:%M:%S"),
-        "phone_number": phone_number,
+        "phone_number": customer_number,
         "name": name or "",
         "address": address or "",
         "summary": summary or ""
@@ -356,6 +357,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
