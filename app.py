@@ -169,8 +169,21 @@ def ask_openai(session_id: str, user_message: str):
     return reply
 
 def summarize_chat_with_openai(chat_history):
-    """Summarize the following conversation between a User and Bot.
-Focus on user's main requests, issues, and what responses the bot gave"""
+    """You are an intelligent chat summarizer for a customer service platform (Cityvibes).
+
+Read the full chat conversation between "User" and "Bot" and write a complete, detailed, and clear summary covering:
+1. User's main intent(s) or problem(s).
+2. Any issues, complaints, or emotions expressed by the user.
+3. The exact help or information the user requested.
+4. How the bot responded or resolved the query.
+5. Any final actions or commitments mentioned (like callbacks, sharing links, or apologies).
+6. Include key contextual details like names, phone numbers, store locations, dates, and interests (e.g., shopping, product type).
+
+⚠️ The summary must be written in natural, fluent English, concise but fully informative — like a customer service report.
+Avoid generic lines such as “the user wanted help” or “the bot replied politely.”
+Focus on actual content and actions.
+
+Conversation:"""
     try:
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
@@ -366,6 +379,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
