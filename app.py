@@ -169,7 +169,8 @@ def ask_openai(session_id: str, user_message: str):
     return reply
 
 def summarize_chat_with_openai(chat_history):
-    """Generate a short summary of the customer's query."""
+    """Summarize the following conversation between a User and Bot.
+Focus on user's main requests, issues, and what responses the bot gave"""
     try:
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
@@ -365,6 +366,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
