@@ -10,6 +10,16 @@ import threading
 import time
 from datetime import datetime, timedelta
 from dateutil import parser
+# timezone helper — uses zoneinfo (py3.9+) or falls back to pytz
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+    def now_in_ist():
+        return datetime.now(ZoneInfo("Asia/Kolkata"))
+except Exception:
+    import pytz
+    def now_in_ist():
+        return datetime.now(pytz.timezone("Asia/Kolkata"))
 LAST_MESSAGE_TIME = {}
 INACTIVITY_TIMEOUT = 120
 log = logging.getLogger('werkzeug')
@@ -122,10 +132,11 @@ def extract_address_with_openai(user_message):
         return None
 
 def log_to_google_sheet(phone_number, sender, message, name=None, address=None):
+    now = now_in_ist()
     payload = {
         "sheet": "Chat_Log",
-        "date": datetime.now().strftime("%d-%m-%Y"),
-        "time": datetime.now().strftime("%H:%M:%S"),
+        "date": now.strftime("%d-%m-%Y"),
+        "time": now.strftime("%H:%M:%S"),
         "phone_number": phone_number,
         "name": name or "",
         "address": address or "",
@@ -237,10 +248,11 @@ def log_summary_to_google_sheet(session_id):
     address = extract_address_with_openai(user_text) or ""
     customer_number = extract_number_with_openai(chat_history) or session_id
 
+    now = now_in_ist()
     payload = {
         "sheet": "Chat_Summary",
-        "date": datetime.now().strftime("%d-%m-%Y"),
-        "time": datetime.now().strftime("%H:%M:%S"),
+        "date": now.strftime("%d-%m-%Y"),
+        "time": now.strftime("%H:%M:%S"),
         "phone_number": customer_number,
         "name": name,
         "address": address,
@@ -256,7 +268,7 @@ def log_summary_to_google_sheet(session_id):
 def start_inactivity_watcher():
     def watcher():
         while True:
-            now = datetime.now()
+            now = now_in_ist()
             for phone, last_time in list(LAST_MESSAGE_TIME.items()):
                 if (now - last_time).total_seconds() > INACTIVITY_TIMEOUT:
                     try:
@@ -314,7 +326,7 @@ def webhook():
                 print(Fore.BLUE + "👤 User: " + Fore.CYAN + text)
                 customer_name = extract_name_with_openai(text)
                 chat_history = SESSION_CONTEXT.get(session_id, [])
-                LAST_MESSAGE_TIME[phone_number] = datetime.now()
+                LAST_MESSAGE_TIME[phone_number] = now_in_ist()
                 customer_address = extract_address_with_openai(
                     "\n".join([m["content"] for m in chat_history if m["role"] == "user"])
                 )
@@ -353,6 +365,7 @@ if __name__ == "__main__":
     start_inactivity_watcher()  # ✅ auto-start background thread
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
